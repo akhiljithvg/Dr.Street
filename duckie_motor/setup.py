@@ -11,7 +11,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
     ],
-    install_requires=['setuptools'],
+    install_requires=['setuptools', 'gpiozero'],
     zip_safe=True,
     maintainer='pi',
     maintainer_email='akhiljithvg444@gmail.com',

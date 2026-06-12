@@ -11,7 +11,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
     ],
-    install_requires=['setuptools'],
+    install_requires=['setuptools', 'pyserial'],
     zip_safe=True,
     maintainer='pi',
     maintainer_email='pi@todo.todo',
@@ -24,7 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'perception_node = duckie_perception.perception_node:main',
+            'followlaneesp_node = duckie_perception.followlaneesp_node:main',
         ],
     },
 )

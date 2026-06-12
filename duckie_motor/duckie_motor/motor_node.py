@@ -12,10 +12,12 @@ class MotorNode(Node):
         super().__init__('motor_node')
 
         # ---------- MOTOR PINS (BCM) ----------
+        # wiring: in1=20, in2=21, in3=16, in4=12
+        # right motor uses 20/21 and left motor uses 16/12
         self.lf = PWMOutputDevice(16, frequency=100)
         self.lb = PWMOutputDevice(12, frequency=100)
-        self.rf = PWMOutputDevice(21, frequency=100)
-        self.rb = PWMOutputDevice(20, frequency=100)
+        self.rf = PWMOutputDevice(20, frequency=100)
+        self.rb = PWMOutputDevice(21, frequency=100)
 
         # ---------- ROS ----------
         self.sub = self.create_subscription(
