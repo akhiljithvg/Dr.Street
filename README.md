@@ -20,6 +20,19 @@ The project also includes legacy Python scripts in the repo root for reference, 
 
 ---
 
+## Repository Structure
+
+- `duckie_bringup/` — ROS 2 launch package. See [duckie_bringup/README.md](duckie_bringup/README.md).
+- `duckie_perception/` — Main ROS 2 perception package. See [duckie_perception/README.md](duckie_perception/README.md).
+- `duckie_motor/` — ROS 2 motor control package. See [duckie_motor/README.md](duckie_motor/README.md).
+- `duckie_safety/` — ROS 2 safety watchdog package. See [duckie_safety/README.md](duckie_safety/README.md).
+- `duckie_simulation/` — Simulation package. See [duckie_simulation/README.md](duckie_simulation/README.md).
+- Root Python scripts:
+  - `aruco.py`, `followlane*.py`, `followlaneesp.py`
+  - Preserved for legacy or experimentation, not required by the current ROS 2 launch path
+
+---
+
 ## Prerequisites
 
 Before you begin, make sure you have:
