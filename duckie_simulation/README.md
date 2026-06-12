@@ -2,17 +2,15 @@
 
 This package contains simulation assets for the Duckie robot.
 
-It includes Gazebo configuration, URDF/Xacro files, launch files, and world definitions.
+## Contents
 
-## Key folders
+- `config/` — ROS 2 configuration files
+- `description/` — robot model files
+- `launch/` — simulation launch files
+- `worlds/` — Gazebo world definitions
 
-- `config/` — ROS 2 compatible configuration files.
-- `description/` — robot model Xacro and URDF files.
-- `launch/` — simulation launch files.
-- `worlds/` — Gazebo world files.
+## Usage
 
-## Main README
-
-See the main project README for full setup and usage instructions:
+See the main README for full setup and run instructions:
 
 [../README.md](../README.md)

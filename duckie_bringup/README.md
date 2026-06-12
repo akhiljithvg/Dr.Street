@@ -1,17 +1,15 @@
 # duckie_bringup
 
-This package provides the launch file for the active Duckie ROS 2 workflow.
+This package contains the ROS 2 launch configuration for the Duckie robot.
 
-It currently launches the `followlaneesp_node` from `duckie_perception`.
+## Contents
 
-## Key files
+- `launch/bringup.launch.py` — main launch file
+- `package.xml` — package metadata
+- `setup.py` and `setup.cfg` — package installation files
 
-- `launch/bringup.launch.py` — main ROS 2 launch file.
-- `package.xml` — ROS 2 package metadata.
-- `setup.py` / `setup.cfg` — Python package installation settings.
+## Usage
 
-## Main README
-
-See the main project README for full setup and usage instructions:
+See the main README for full setup and run instructions:
 
 [../README.md](../README.md)

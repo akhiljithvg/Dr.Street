@@ -1,138 +1,130 @@
 # 🦆 Duckie Autonomous Robot (ROS 2)
 
-A beginner-friendly ROS 2 robotics project for autonomous lane following, ArUco marker navigation, and serial motor control via an ESP32.
+A beginner-friendly ROS 2 project for autonomous lane following, ArUco junction control, and serial motor control using an ESP32.
 
-This README explains every step from installing prerequisites to launching the active ROS 2 node.
+## Table of Contents
+
+- [Overview](#overview)
+- [Features](#features)
+- [Repository Structure](#repository-structure)
+- [Prerequisites](#prerequisites)
+- [Setup](#setup)
+  - [Install system packages](#install-system-packages)
+  - [Prepare the workspace](#prepare-the-workspace)
+  - [Build the packages](#build-the-packages)
+  - [Source the workspace](#source-the-workspace)
+- [Run](#run)
+  - [Launch with ROS 2](#launch-with-ros-2)
+  - [Run the node directly](#run-the-node-directly)
+- [Expected behavior](#expected-behavior)
+- [Troubleshooting](#troubleshooting)
+- [Notes](#notes)
+- [License](#license)
 
 ---
 
-## What this project does
+## Overview
 
-The current active ROS 2 node is `duckie_perception/duckie_perception/followlaneesp_node.py`.
-It:
+The active ROS 2 node in this repository is:
+
+- `duckie_perception/duckie_perception/followlaneesp_node.py`
+
+This node:
 
 - reads a USB camera stream
 - detects red lane markings using OpenCV
 - detects ArUco junction markers
-- sends motor commands to an ESP32 over serial
+- sends motor commands over serial to an ESP32
 
-The project also includes legacy Python scripts in the repo root for reference, but the current ROS 2 workflow uses the `followlaneesp_node` node.
+Legacy Python scripts are kept for reference only.
+
+---
+
+## Features
+
+- Beginner-friendly ROS 2 project structure
+- USB camera lane detection with OpenCV
+- ArUco marker junction handling
+- Serial motor commands to ESP32
+- ROS 2 launch file workflow
+- Package-level documentation
 
 ---
 
 ## Repository Structure
 
-- `duckie_bringup/` — ROS 2 launch package. See [duckie_bringup/README.md](duckie_bringup/README.md).
-- `duckie_perception/` — Main ROS 2 perception package. See [duckie_perception/README.md](duckie_perception/README.md).
-- `duckie_motor/` — ROS 2 motor control package. See [duckie_motor/README.md](duckie_motor/README.md).
-- `duckie_safety/` — ROS 2 safety watchdog package. See [duckie_safety/README.md](duckie_safety/README.md).
-- `duckie_simulation/` — Simulation package. See [duckie_simulation/README.md](duckie_simulation/README.md).
-- Root Python scripts:
-  - `aruco.py`, `followlane*.py`, `followlaneesp.py`
-  - Preserved for legacy or experimentation, not required by the current ROS 2 launch path
+- `duckie_bringup/` — ROS 2 launch package. See [duckie_bringup/README.md](duckie_bringup/README.md)
+- `duckie_perception/` — Active perception package. See [duckie_perception/README.md](duckie_perception/README.md)
+- `duckie_motor/` — Motor control package. See [duckie_motor/README.md](duckie_motor/README.md)
+- `duckie_safety/` — Safety watchdog package. See [duckie_safety/README.md](duckie_safety/README.md)
+- `duckie_simulation/` — Simulation assets. See [duckie_simulation/README.md](duckie_simulation/README.md)
+
+Root Python scripts:
+
+- `aruco.py`, `followlane.py`, `followlane2.py`, `followlane3.py`, `followlane4.py`, `followlaneesp.py`
 
 ---
 
 ## Prerequisites
 
-Before you begin, make sure you have:
+Before starting, make sure you have:
 
-- Ubuntu (desktop or Raspberry Pi OS based on Ubuntu)
+- Ubuntu or Raspberry Pi OS based on Ubuntu
 - ROS 2 installed (`humble`, `iron`, or `galactic`)
-- `colcon` build tool installed
-- a USB camera connected
-- an ESP32 or serial motor driver connected at `/dev/ttyS0`
+- `colcon` build tool
+- USB camera connected
+- ESP32 or serial motor driver connected at `/dev/ttyS0`
 
 ---
 
-## Step 1: Install required system packages
+## Setup
 
-Open a terminal and run:
+### Install system packages
 
 ```bash
 sudo apt update
 sudo apt install -y python3-pip python3-opencv
-```
-
-Next install the Python dependency:
-
-```bash
 python3 -m pip install --user pyserial
 ```
 
-If you are missing ROS 2 packages, install them with your ROS 2 distro name:
+Install required ROS 2 packages for your distro:
 
 ```bash
 sudo apt install -y ros-<ros2-distro>-cv-bridge ros-<ros2-distro>-launch-ros
 ```
 
-Replace `<ros2-distro>` with your ROS 2 version, for example `humble`, `iron`, or `galactic`.
+Replace `<ros2-distro>` with your ROS 2 distribution name.
 
----
-
-## Step 2: Prepare the workspace
-
-From the repository root:
+### Prepare the workspace
 
 ```bash
 cd /home/pi/ak_ws/src/duckie
 ```
 
-This project assumes your workspace is located at `/home/pi/ak_ws/src/duckie`.
-
----
-
-## Step 3: Source ROS 2
-
-Source your ROS 2 installation before building or running anything:
+### Build the packages
 
 ```bash
 source /opt/ros/<ros2-distro>/setup.bash
-```
-
-If you are using a ROS 2 overlay workspace, source the overlay after building too.
-
----
-
-## Step 4: Build the packages
-
-Build only the packages currently used by the active ROS 2 node:
-
-```bash
 colcon build --packages-select duckie_perception duckie_bringup
 ```
 
-If you see errors during build, read the terminal message carefully and install any missing ROS 2 dependencies.
-
----
-
-## Step 5: Source the build output
-
-After building, source the local install workspace:
+### Source the workspace
 
 ```bash
 source install/setup.bash
 ```
 
-This makes the new ROS 2 node available to `ros2 run` and `ros2 launch`.
-
 ---
 
-## Step 6: Run the active ROS 2 node
+## Run
 
-Start the project with the launch file:
+### Launch with ROS 2
 
 ```bash
 ros2 launch duckie_bringup bringup.launch.py
 ```
 
-This runs the `followlaneesp_node` node by default.
-
----
-
-## Optional: Run the node directly
-
-If you want to run just the perception node without the launch file:
+### Run the node directly
 
 ```bash
 ros2 run duckie_perception followlaneesp_node
@@ -140,31 +132,31 @@ ros2 run duckie_perception followlaneesp_node
 
 ---
 
-## What to expect
+## Expected behavior
 
-- The node opens the camera and reads frames.
-- It detects red lane markings and ArUco markers.
-- It sends motor commands to the ESP32 over `/dev/ttyS0`.
-- If an ArUco marker is detected, the robot pauses briefly, then performs the required action.
+- Camera frames are captured and processed
+- Red lane lines are detected
+- ArUco markers are detected at junctions
+- Motor commands are sent to the ESP32
+- The robot pauses briefly after ArUco detection before acting
 
 ---
 
 ## Troubleshooting
 
-- If the camera does not open, confirm the USB camera is connected and accessible.
-- If serial communication fails, confirm the ESP32 is connected to `/dev/ttyS0` or update the parameter.
-- If ROS 2 cannot find the node, make sure you sourced `install/setup.bash` after building.
+- **Camera issues:** verify the USB camera is connected and accessible
+- **Serial issues:** verify the ESP32 is available at `/dev/ttyS0`
+- **ROS 2 node missing:** ensure `source install/setup.bash` was run after build
 
 ---
 
 ## Notes
 
-- The legacy `perception_node.py` file has been removed from the current workflow.
-- Root scripts like `aruco.py`, `followlane.py`, and `followlaneesp.py` are kept for reference only.
-- The current active ROS 2 node is `followlaneesp_node`.
+- The legacy `perception_node.py` file is no longer used.
+- Root Python scripts are preserved for reference and offline testing.
 
 ---
 
 ## License
 
-No license file is included. Add one before sharing or publishing this project.
+No license is included in this repository. Add one before sharing or publishing.

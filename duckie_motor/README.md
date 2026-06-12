@@ -1,17 +1,15 @@
 # duckie_motor
 
-This ROS 2 package contains the motor interface for the Duckie robot.
+This package provides motor control for the Duckie robot.
 
-It handles motor command execution and provides the console script for the motor node.
+## Contents
 
-## Key files
+- `duckie_motor/duckie_motor/motor_node.py` — motor node implementation
+- `package.xml` — package metadata
+- `setup.py` and `setup.cfg` — package installation files
 
-- `duckie_motor/motor_node.py` — ROS 2 motor node implementation.
-- `package.xml` — ROS 2 package metadata.
-- `setup.py` / `setup.cfg` — Python package installation settings.
+## Usage
 
-## Main README
-
-See the main project README for full setup and usage instructions:
+See the main README for full setup and run instructions:
 
 [../README.md](../README.md)

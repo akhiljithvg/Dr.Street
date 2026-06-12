@@ -1,17 +1,15 @@
 # duckie_safety
 
-This ROS 2 package contains the safety watchdog for the Duckie robot.
+This package provides the safety watchdog for the Duckie robot.
 
-It monitors motor commands and provides a safety layer to stop the robot if needed.
+## Contents
 
-## Key files
+- `duckie_safety/watchdog_node.py` — safety monitoring node
+- `package.xml` — package metadata
+- `setup.py` and `setup.cfg` — package installation files
 
-- `watchdog_node.py` — watchdog node implementation.
-- `package.xml` — ROS 2 package metadata.
-- `setup.py` / `setup.cfg` — Python package installation settings.
+## Usage
 
-## Main README
-
-See the main project README for full setup and usage instructions:
+See the main README for full setup and run instructions:
 
 [../README.md](../README.md)

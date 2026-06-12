@@ -1,20 +1,20 @@
 # duckie_perception
 
-This ROS 2 package contains the active perception node for the Duckie robot.
+This package contains the main perception node for the Duckie robot.
 
-The current node in use is:
+## Active node
 
 - `duckie_perception/duckie_perception/followlaneesp_node.py`
 
-It is responsible for:
+## Responsibilities
 
-- reading the USB camera stream
-- detecting red lane markings
-- detecting ArUco junction markers
-- sending motor commands over serial to an ESP32
+- camera input processing
+- red lane detection
+- ArUco junction detection
+- serial motor command output
 
-## Main README
+## Usage
 
-See the main project README for build and launch instructions:
+See the main README for full setup and run instructions:
 
 [../README.md](../README.md)
