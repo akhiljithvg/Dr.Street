@@ -1,4 +1,4 @@
-# 🦆 Duckie Autonomous Robot – Complete Guide for Students
+# 🦆 Duckie Autonomous Robot
 
 A complete, hands-on ROS 2 robotics project for learning autonomous navigation, computer vision, and embedded systems.
 
