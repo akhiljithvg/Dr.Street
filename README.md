@@ -11,15 +11,16 @@ This guide is designed for **university students and beginners** and covers ever
 1. [Project Overview](#project-overview)
 2. [What You'll Learn](#what-youll-learn)
 3. [Prerequisites & Requirements](#prerequisites--requirements)
-4. [Part 1: Ubuntu Server Setup](#part-1-ubuntu-server-setup)
-5. [Part 2: Understanding the Standalone Python Script](#part-2-understanding-the-standalone-python-script)
-6. [Part 3: ROS 2 Jazzy Installation](#part-3-ros-2-jazzy-installation)
-7. [Part 4: Building the ROS 2 Project](#part-4-building-the-ros-2-project)
-8. [Part 5: Running the Robot](#part-5-running-the-robot)
-9. [Project Architecture](#project-architecture)
-10. [Troubleshooting](#troubleshooting)
-11. [Next Steps](#next-steps)
-12. [References](#references)
+4. [Hardware Assembly & Wiring](#hardware-assembly--wiring)
+5. [Part 1: Ubuntu Server Setup](#part-1-ubuntu-server-setup)
+6. [Part 2: Understanding the Standalone Python Script](#part-2-understanding-the-standalone-python-script)
+7. [Part 3: ROS 2 Jazzy Installation](#part-3-ros-2-jazzy-installation)
+8. [Part 4: Building the ROS 2 Project](#part-4-building-the-ros-2-project)
+9. [Part 5: Running the Robot](#part-5-running-the-robot)
+10. [Project Architecture](#project-architecture)
+11. [Troubleshooting](#troubleshooting)
+12. [Next Steps](#next-steps)
+13. [References](#references)
 
 ---
 
@@ -77,6 +78,123 @@ By completing this project, you will understand:
 
 - Internet connection (for installation)
 - SSH access (if using Raspberry Pi remotely)
+---
+
+## Hardware Assembly & Wiring
+
+This section covers the physical assembly, connections, and wiring of the Duckie robot. The project supports two primary hardware control architectures:
+
+*   **Option A: ESP32 Serial Co-Processor (Default / Recommended)**: The Raspberry Pi handles high-level computer vision and ROS 2 processing, sending motor commands over serial UART to an ESP32 microcontroller, which directly controls the motor driver.
+*   **Option B: Direct Raspberry Pi GPIO Control**: The Raspberry Pi controls the motor driver directly via GPIO pins using `gpiozero` (bypassing the ESP32 co-processor).
+
+---
+
+### Option A: ESP32 Serial Co-Processor Configuration
+
+This architecture splits the workload: the Raspberry Pi runs the heavy computer vision algorithms, and the ESP32 acts as a real-time motor controller.
+
+#### 1. Wiring & Pin Mappings
+Connect the Raspberry Pi, ESP32, and the motor driver (e.g., L298N or similar dual H-bridge) as follows:
+
+| Connection Source | Source Pin | Connection Destination | Destination Pin | Description |
+| :--- | :--- | :--- | :--- | :--- |
+| **Raspberry Pi** | GPIO 14 (TXD) | **ESP32** | RX0 (GPIO 3) | Serial TX to RX |
+| **Raspberry Pi** | GPIO 15 (RXD) | **ESP32** | TX0 (GPIO 1) | Serial RX to TX |
+| **Raspberry Pi** | GND | **ESP32** | GND | Reference ground |
+| **ESP32** | GPIO 14 (OUT) | **Motor Driver** | IN1 (Right Motor Forward) | Right Motor forward signal |
+| **ESP32** | GPIO 15 (OUT) | **Motor Driver** | IN2 (Right Motor Backward) | Right Motor backward signal |
+| **ESP32** | GPIO 12 (OUT) | **Motor Driver** | IN3 (Left Motor Forward) | Left Motor forward signal |
+| **ESP32** | GPIO 13 (OUT) | **Motor Driver** | IN4 (Left Motor Backward) | Left Motor backward signal |
+| **Motor Driver** | OUT1 / OUT2 | **Right Motor** | +/- | Right motor terminals |
+| **Motor Driver** | OUT3 / OUT4 | **Left Motor** | +/- | Left motor terminals |
+
+> [!CAUTION]
+> **Common Ground**: Ensure a common ground pin connects the Raspberry Pi GND, ESP32 GND, and Motor Driver GND. Without a shared ground reference, serial communication packets will be corrupted, and the motors will run erratically or not at all.
+
+> [!TIP]
+> **USB UART Disconnection**: Since the ESP32's primary hardware Serial port (`RX0`/`TX0` on pins 3/1) is shared with the onboard USB programming chip, you may need to temporarily disconnect the RX/TX wires between the Raspberry Pi and the ESP32 while uploading code from your computer to avoid programming conflicts.
+
+#### 2. ESP32 Firmware (Arduino Sketch)
+Upload the following firmware to your ESP32. It listens on the hardware `Serial` port (`115200` baud) for motor command packets formatted as `left_speed,right_speed\n` (range: `-255` to `255`), parses them, and drives the motors using PWM.
+
+```cpp
+#include <Arduino.h>
+
+// Define your motor pins
+const int LEFT_F = 12; 
+const int LEFT_B = 13;
+const int RIGHT_F = 14; 
+const int RIGHT_B = 15;
+
+// PWM configuration
+const int freq = 5000;
+const int res = 8; // 8-bit resolution (0-255)
+
+void setup() {
+  Serial.begin(115200);
+
+  // Initialize channels 0-3
+  ledcSetup(0, freq, res);
+  ledcSetup(1, freq, res);
+  ledcSetup(2, freq, res);
+  ledcSetup(3, freq, res);
+
+  // Attach pins to channels
+  ledcAttachPin(LEFT_F, 0);
+  ledcAttachPin(LEFT_B, 1);
+  ledcAttachPin(RIGHT_F, 2);
+  ledcAttachPin(RIGHT_B, 3);
+}
+
+void loop() {
+  if (Serial.available() > 0) {
+    // Read command string until newline
+    String data = Serial.readStringUntil('\n');
+    int commaIndex = data.indexOf(',');
+    
+    if (commaIndex > 0) {
+      int left = data.substring(0, commaIndex).toInt();
+      int right = data.substring(commaIndex + 1).toInt();
+      
+      // Update PWM signals
+      // Forward if speed is positive, reverse if negative
+      ledcWrite(0, (left > 0) ? left : 0);
+      ledcWrite(1, (left < 0) ? abs(left) : 0);
+      ledcWrite(2, (right > 0) ? right : 0);
+      ledcWrite(3, (right < 0) ? abs(right) : 0);
+    }
+  }
+}
+```
+
+> [!NOTE]
+> **Symmetric vs. Mirrored Command Formats**: The ROS 2 perception node (`followlaneesp_node.py`) swaps the left and right values before transmitting to account for motor mirror configurations (e.g. `actual_left = right`, `actual_right = left`). Keep this in mind when mapping your motor connections.
+
+---
+
+### Option B: Direct Raspberry Pi GPIO Configuration
+
+For a simpler build without an ESP32 co-processor, you can connect the motor driver directly to the Raspberry Pi GPIO headers. The `duckie_motor` ROS 2 package (`motor_node.py`) is preconfigured for this setup using `gpiozero`.
+
+#### Pin Mappings (BCM)
+
+| Raspberry Pi Pin (BCM) | Motor Driver Pin | Description |
+| :--- | :--- | :--- |
+| **GPIO 20** | IN1 (Right Motor Forward) | Right Motor Forward PWM |
+| **GPIO 21** | IN2 (Right Motor Backward) | Right Motor Backward PWM |
+| **GPIO 16** | IN3 (Left Motor Forward) | Left Motor Forward PWM |
+| **GPIO 12** | IN4 (Left Motor Backward) | Left Motor Backward PWM |
+| **GND** | GND | Common reference ground |
+
+---
+
+### Power Distribution & System Safety
+
+To build a reliable robot and protect your hardware:
+
+1.  **Dual Power Isolation**: DC motors generate inductive kickback and electrical noise that can cause the Raspberry Pi or ESP32 to brown out or reset. Power the Raspberry Pi with a dedicated power bank or high-quality buck converter, and power the motors using a separate battery pack (e.g. 7.4V Li-ion or 11.1V LiPo).
+2.  **Logic Level Verification**: The Raspberry Pi and ESP32 operate on 3.3V logic levels. Ensure that your motor driver inputs can accept 3.3V logic signals (most standard L298N drivers accept 3.3V/5V logic input, so they can be driven directly).
+3.  **Emergency Shutoff**: Always place a physical power switch on the motor power rail so you can immediately disable the motors if the autonomous code behaves unexpectedly.
 
 ---
 
