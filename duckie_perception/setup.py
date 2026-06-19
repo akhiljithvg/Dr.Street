@@ -1,4 +1,6 @@
 from setuptools import find_packages, setup
+import os
+from glob import glob
 
 package_name = 'duckie_perception'
 
@@ -10,8 +12,9 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        (os.path.join('share', package_name, 'launch'), glob(os.path.join('launch', '*.launch.py'))),
     ],
-    install_requires=['setuptools', 'pyserial'],
+    install_requires=['setuptools', 'pyserial', 'flask'],
     zip_safe=True,
     maintainer='pi',
     maintainer_email='pi@todo.todo',
@@ -25,6 +28,7 @@ setup(
     entry_points={
         'console_scripts': [
             'followlaneesp_node = duckie_perception.followlaneesp_node:main',
+            'video_stream_node = duckie_perception.video_stream_node:main',
         ],
     },
 )
