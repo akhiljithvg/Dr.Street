@@ -233,7 +233,7 @@ class VideoStreamNode(Node):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Duckie Autonomous Robot - Control Hub</title>
+    <title>DR. Street - Autonomous Control Hub</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -242,10 +242,10 @@ class VideoStreamNode(Node):
             --bg-card: rgba(25, 33, 56, 0.85);
             --text-main: #F3F4F6;
             --text-muted: #9CA3AF;
-            --primary: #FFB800; /* Duckie Yellow */
+            --primary: #10B981; /* DR. Street Green */
             --success: #10B981;
             --error: #EF4444;
-            --border-glow: rgba(255, 184, 0, 0.15);
+            --border-glow: rgba(16, 185, 129, 0.15);
             --glass-border: rgba(255, 255, 255, 0.08);
         }
 
@@ -265,7 +265,7 @@ class VideoStreamNode(Node):
             align-items: center;
             overflow-x: hidden;
             background-image: 
-                radial-gradient(at 0% 0%, rgba(255, 184, 0, 0.05) 0px, transparent 50%),
+                radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.05) 0px, transparent 50%),
                 radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.04) 0px, transparent 50%);
         }
 
@@ -278,20 +278,36 @@ class VideoStreamNode(Node):
             align-items: center;
         }
 
-        .logo {
+        .logo-container {
             display: flex;
             align-items: center;
             gap: 0.75rem;
-            font-size: 1.5rem;
-            font-weight: 800;
-            letter-spacing: 0.1rem;
-            color: var(--text-main);
-            text-transform: uppercase;
         }
 
-        .logo span {
-            color: var(--primary);
-            text-shadow: 0 0 15px rgba(255, 184, 0, 0.6);
+        .logo-icon {
+            filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.4));
+        }
+
+        .logo-text {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .brand-name {
+            font-size: 1.5rem;
+            font-weight: 800;
+            line-height: 1.1;
+            color: #10B981;
+            letter-spacing: 0.05rem;
+        }
+
+        .brand-tagline {
+            font-size: 0.75rem;
+            font-weight: 400;
+            color: var(--text-muted);
+            letter-spacing: 0.08rem;
+            margin-top: 0.1rem;
         }
 
         .connection-badge {
@@ -589,8 +605,27 @@ class VideoStreamNode(Node):
 </head>
 <body>
     <header>
-        <div class="logo">
-            <span>🦆</span> Duckie Control Hub
+        <div class="logo-container">
+            <svg class="logo-icon" width="44" height="44" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- Outer Rim (dark grey) -->
+                <circle cx="50" cy="50" r="40" stroke="#374151" stroke-width="8" />
+                <!-- Green highlights on the rim -->
+                <path d="M14.6 30 A 36 36 0 0 1 25 18" stroke="#10B981" stroke-width="8" stroke-linecap="round" />
+                <path d="M85.4 30 A 36 36 0 0 0 75 18" stroke="#10B981" stroke-width="8" stroke-linecap="round" />
+                <!-- Center hub -->
+                <circle cx="50" cy="50" r="14" fill="#374151" stroke="#10B981" stroke-width="4" />
+                <circle cx="50" cy="50" r="5" fill="#10B981" />
+                <!-- Spokes -->
+                <path d="M18 50 L 36 50" stroke="#374151" stroke-width="8" />
+                <path d="M64 50 L 82 50" stroke="#374151" stroke-width="8" />
+                <path d="M50 64 L 50 82" stroke="#374151" stroke-width="8" />
+                <path d="M38 58 L 26 70" stroke="#374151" stroke-width="8" />
+                <path d="M62 58 L 74 70" stroke="#374151" stroke-width="8" />
+            </svg>
+            <div class="logo-text">
+                <span class="brand-name">DR. Street</span>
+                <span class="brand-tagline">Code your path</span>
+            </div>
         </div>
         <div class="connection-badge">
             <div class="connection-indicator"></div>
@@ -668,7 +703,7 @@ class VideoStreamNode(Node):
     </main>
 
     <footer>
-        🦆 Duckie Autonomous Mobile Robot System | Version 1.0.0
+        🚗 DR. Street Autonomous Mobile Robot System | Version 1.0.0
     </footer>
 
     <script>

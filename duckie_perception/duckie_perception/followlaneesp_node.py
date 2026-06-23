@@ -8,6 +8,8 @@ import serial
 
 import rclpy
 from rclpy.node import Node
+from std_msgs.msg import Bool
+from sensor_msgs.msg import Image
 
 
 class FollowLaneESPNode(Node):
@@ -61,6 +63,16 @@ class FollowLaneESPNode(Node):
         self.serial_port = self.get_parameter('serial_port').value
         self.baudrate = self.get_parameter('baudrate').value
 
+        # --- Motor enable gate (controlled via web UI) ---
+        # Starts as False — motors will not move until /robot_enabled publishes True.
+        self.robot_enabled = False
+
+        # Subscribe to the enable/disable topic published by video_stream_node
+        self.create_subscription(Bool, '/robot_enabled', self._robot_enabled_cb, 10)
+
+        # Publisher for raw camera frames to avoid device contention
+        self.image_pub = self.create_publisher(Image, '/camera/image_raw', 10)
+
         try:
             self.ser = serial.Serial(self.serial_port, self.baudrate, timeout=0.1)
             self.get_logger().info(f'Opened serial port: {self.serial_port}@{self.baudrate}')
@@ -75,8 +87,20 @@ class FollowLaneESPNode(Node):
 
         # Timer callback runs at ~30 Hz and drives the camera/process loop.
         self.timer = self.create_timer(1.0 / 30.0, self.timer_callback)
-        self.get_logger().info('FollowLaneESP ROS2 node started')
+        self.get_logger().info('FollowLaneESP ROS2 node started — waiting for START from web UI')
 
+    # ------------------------------------------------
+    def _robot_enabled_cb(self, msg: Bool):
+        """Called when the web UI Start/Stop button is pressed."""
+        prev = self.robot_enabled
+        self.robot_enabled = msg.data
+        if self.robot_enabled and not prev:
+            self.get_logger().info('🟢 Robot ENABLED — starting lane following')
+        elif not self.robot_enabled and prev:
+            self.stop_motor()
+            self.get_logger().info('🔴 Robot DISABLED — motors stopped')
+
+    # ------------------------------------------------
     def clamp(self, x, lo=0, hi=100):
         return max(lo, min(hi, int(x)))
 
@@ -164,6 +188,26 @@ class FollowLaneESPNode(Node):
         ret, frame = self.cap.read()
         if not ret:
             self.get_logger().warning('Camera read failed')
+            return
+
+        # Publish the raw frame to prevent device contention and allow video streaming
+        try:
+            img_msg = Image()
+            img_msg.header.stamp = self.get_clock().now().to_msg()
+            img_msg.header.frame_id = 'camera_frame'
+            img_msg.height = frame.shape[0]
+            img_msg.width = frame.shape[1]
+            img_msg.encoding = 'bgr8'
+            img_msg.is_bigendian = 0
+            img_msg.step = frame.shape[1] * 3
+            img_msg.data = frame.tobytes()
+            self.image_pub.publish(img_msg)
+        except Exception as exc:
+            self.get_logger().error(f'Failed to publish camera frame: {exc}')
+
+        # Gate: do not move motors until the web UI sends the START command.
+        if not self.robot_enabled:
+            self.stop_motor()
             return
 
         action_to_execute = None
