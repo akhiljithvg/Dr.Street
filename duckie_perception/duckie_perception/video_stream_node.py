@@ -17,8 +17,9 @@ import numpy as np
 import rclpy
 from flask import Flask, Response
 from rclpy.node import Node
+from geometry_msgs.msg import Twist
 from sensor_msgs.msg import Image
-from std_msgs.msg import Bool
+from std_msgs.msg import Bool, String
 
 
 class VideoStreamNode(Node):
@@ -65,9 +66,16 @@ class VideoStreamNode(Node):
         self.lane_detected = False
         self.lane_error = 0
         self.detected_aruco_id = None
+        self.control_mode = 'auto'  # 'auto' or 'manual'
 
         # Publisher to control robot enable/disable
         self.enabled_pub = self.create_publisher(Bool, '/robot_enabled', 10)
+
+        # Publisher to set control mode
+        self.mode_pub = self.create_publisher(String, '/control_mode', 10)
+
+        # Publisher for manual drive commands
+        self.manual_cmd_pub = self.create_publisher(Twist, '/cmd_manual', 10)
 
         # Subscribe to frames published by followlaneesp_node
         self.image_sub = self.create_subscription(
@@ -205,7 +213,8 @@ class VideoStreamNode(Node):
                 'robot_enabled': self.robot_enabled,
                 'lane_detected': self.lane_detected,
                 'lane_error': int(self.lane_error),
-                'aruco_id': self.detected_aruco_id
+                'aruco_id': self.detected_aruco_id,
+                'control_mode': self.control_mode
             }
 
         @self.app.route('/api/start', methods=['POST'])
@@ -225,6 +234,32 @@ class VideoStreamNode(Node):
             self.enabled_pub.publish(msg)
             self.get_logger().info('Sent STOP command to robot')
             return {'status': 'stopped'}
+
+        @self.app.route('/api/mode', methods=['POST'])
+        def api_mode():
+            from flask import request
+            data = request.get_json(force=True, silent=True) or {}
+            new_mode = data.get('mode', 'auto')
+            if new_mode not in ('auto', 'manual'):
+                return {'error': 'invalid mode'}, 400
+            self.control_mode = new_mode
+            msg = String()
+            msg.data = new_mode
+            self.mode_pub.publish(msg)
+            self.get_logger().info(f'Control mode set to: {new_mode}')
+            return {'mode': new_mode}
+
+        @self.app.route('/api/drive', methods=['POST'])
+        def api_drive():
+            from flask import request
+            data = request.get_json(force=True, silent=True) or {}
+            throttle = float(data.get('throttle', 0.0))
+            steer    = float(data.get('steer', 0.0))
+            msg = Twist()
+            msg.linear.x  = max(-100.0, min(100.0, throttle))
+            msg.angular.z = max(-100.0, min(100.0, steer))
+            self.manual_cmd_pub.publish(msg)
+            return {'throttle': msg.linear.x, 'steer': msg.angular.z}
 
         @self.app.route('/')
         def index():
@@ -601,6 +636,134 @@ class VideoStreamNode(Node):
             color: var(--text-muted);
             letter-spacing: 0.05rem;
         }
+
+        /* ---- Mode Toggle ---- */
+        .mode-toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--glass-border);
+            border-radius: 14px;
+            padding: 1rem 1.25rem;
+        }
+
+        .mode-label {
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+        }
+
+        .mode-label span:first-child {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05rem;
+        }
+
+        .mode-label .mode-current {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--primary);
+            text-transform: uppercase;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Pill toggle */
+        .toggle-pill {
+            position: relative;
+            display: inline-flex;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--glass-border);
+            border-radius: 9999px;
+            padding: 4px;
+            gap: 4px;
+            cursor: pointer;
+        }
+
+        .toggle-pill button {
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 600;
+            padding: 0.4rem 1rem;
+            border-radius: 9999px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.04rem;
+        }
+
+        .toggle-pill button.active {
+            background: var(--primary);
+            color: #fff;
+            box-shadow: 0 0 14px rgba(16,185,129,0.4);
+        }
+
+        /* ---- D-Pad ---- */
+        .dpad-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1.25rem;
+            padding: 1.5rem;
+            background: rgba(255,255,255,0.02);
+            border-radius: 16px;
+            border: 1px solid var(--glass-border);
+            transition: opacity 0.3s ease;
+        }
+
+        .dpad-section.disabled {
+            opacity: 0.25;
+            pointer-events: none;
+        }
+
+        .dpad-hint {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            letter-spacing: 0.04rem;
+        }
+
+        .dpad-grid {
+            display: grid;
+            grid-template-areas:
+                ". up ."
+                "left center right"
+                ". down .";
+            grid-template-columns: repeat(3, 60px);
+            grid-template-rows: repeat(3, 60px);
+            gap: 6px;
+        }
+
+        .dpad-btn {
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 12px;
+            background: rgba(255,255,255,0.05);
+            color: var(--text-main);
+            font-size: 1.4rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .dpad-btn:active, .dpad-btn.pressed {
+            background: var(--primary);
+            border-color: var(--primary);
+            box-shadow: 0 0 16px rgba(16,185,129,0.5);
+            transform: scale(0.93);
+        }
+
+        #dpad-up    { grid-area: up; }
+        #dpad-left  { grid-area: left; }
+        #dpad-center{ grid-area: center; background: rgba(255,255,255,0.02); cursor: default; font-size: 0.6rem; color: var(--text-muted); }
+        #dpad-right { grid-area: right; }
+        #dpad-down  { grid-area: down; }
     </style>
 </head>
 <body>
@@ -667,6 +830,37 @@ class VideoStreamNode(Node):
                 </button>
             </div>
 
+            <!-- Mode Toggle -->
+            <div class="mode-toggle-row">
+                <div class="mode-label">
+                    <span>Drive Mode</span>
+                    <span class="mode-current" id="modeCurrentText">AUTO</span>
+                </div>
+                <div class="toggle-pill">
+                    <button id="btnModeAuto" class="active" onclick="setMode('auto')">Auto</button>
+                    <button id="btnModeManual" onclick="setMode('manual')">Manual</button>
+                </div>
+            </div>
+
+            <!-- Manual D-Pad -->
+            <div class="dpad-section disabled" id="dpadSection">
+                <span class="dpad-hint">Use WASD or click to drive</span>
+                
+                <!-- Speed Slider -->
+                <div style="width: 100%; max-width: 200px; margin-top: 10px; margin-bottom: 10px; text-align: center;">
+                    <span class="dpad-hint" style="display: block; margin-bottom: 4px;">Max Speed: <span id="speedValText" style="color: var(--primary); font-weight: bold;">60</span>%</span>
+                    <input type="range" id="speedSlider" min="15" max="100" value="60" style="width: 100%; accent-color: var(--primary);">
+                </div>
+
+                <div class="dpad-grid">
+                    <div class="dpad-btn" id="dpad-up">W</div>
+                    <div class="dpad-btn" id="dpad-left">A</div>
+                    <div class="dpad-btn" id="dpad-center"></div>
+                    <div class="dpad-btn" id="dpad-right">D</div>
+                    <div class="dpad-btn" id="dpad-down">S</div>
+                </div>
+            </div>
+
             <hr style="border: 0; border-top: 1px solid rgba(255, 255, 255, 0.08); margin: 0.5rem 0;">
 
             <div class="panel-title">
@@ -716,6 +910,19 @@ class VideoStreamNode(Node):
         const offsetText = document.getElementById('offsetText');
         const arucoValue = document.getElementById('arucoValue');
 
+        const modeCurrentText = document.getElementById('modeCurrentText');
+        const btnModeAuto = document.getElementById('btnModeAuto');
+        const btnModeManual = document.getElementById('btnModeManual');
+        const dpadSection = document.getElementById('dpadSection');
+
+        const speedSlider = document.getElementById('speedSlider');
+        const speedValText = document.getElementById('speedValText');
+
+        speedSlider.addEventListener('input', (e) => {
+            speedValText.textContent = e.target.value;
+            calculateDrive();
+        });
+
         function updateUI(data) {
             // Update state
             if (data.robot_enabled) {
@@ -730,6 +937,23 @@ class VideoStreamNode(Node):
                 statusLabelText.style.color = 'var(--text-muted)';
                 startBtn.disabled = false;
                 stopBtn.disabled = true;
+            }
+
+            // Update drive mode
+            if (data.control_mode === 'manual') {
+                modeCurrentText.textContent = 'MANUAL';
+                btnModeAuto.classList.remove('active');
+                btnModeManual.classList.add('active');
+                if (data.robot_enabled) {
+                    dpadSection.classList.remove('disabled');
+                } else {
+                    dpadSection.classList.add('disabled');
+                }
+            } else {
+                modeCurrentText.textContent = 'AUTO';
+                btnModeManual.classList.remove('active');
+                btnModeAuto.classList.add('active');
+                dpadSection.classList.add('disabled');
             }
 
             // Update lane tracking telemetry
@@ -777,6 +1001,141 @@ class VideoStreamNode(Node):
             } catch (err) {
                 console.error('Failed to send command:', err);
             }
+        }
+
+        async function setMode(mode) {
+            try {
+                await fetch('/api/mode', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mode: mode })
+                });
+                pollTelemetry();
+            } catch (err) {
+                console.error('Failed to set mode:', err);
+            }
+        }
+
+        // --- Manual Drive Control Logic ---
+        let currentThrottle = 0;
+        let currentSteer = 0;
+
+        // AbortController to cancel pending requests if a new one arrives instantly
+        let driveAbortController = null;
+
+        async function sendDrive(t, s) {
+            if (driveAbortController) {
+                driveAbortController.abort(); // Cancel previous delayed request
+            }
+            driveAbortController = new AbortController();
+            try {
+                await fetch('/api/drive', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ throttle: t, steer: s }),
+                    signal: driveAbortController.signal
+                });
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    console.error('Failed to send drive:', err);
+                }
+            }
+        }
+
+        const keys = { w: false, a: false, s: false, d: false };
+        const keyMap = { 
+            'w': 'dpad-up', 'ArrowUp': 'dpad-up',
+            's': 'dpad-down', 'ArrowDown': 'dpad-down',
+            'a': 'dpad-left', 'ArrowLeft': 'dpad-left',
+            'd': 'dpad-right', 'ArrowRight': 'dpad-right'
+        };
+
+        function calculateDrive() {
+            let t = 0;
+            let s = 0;
+            const maxSpd = parseInt(speedSlider.value);
+            const turnSpd = Math.max(15, parseInt(maxSpd * 0.7));
+
+            if (keys.w) t = maxSpd;
+            if (keys.s) t = -maxSpd;
+            if (keys.a) s = turnSpd;
+            if (keys.d) s = -turnSpd;
+            
+            if (t !== currentThrottle || s !== currentSteer) {
+                currentThrottle = t;
+                currentSteer = s;
+                sendDrive(t, s);
+            }
+        }
+
+        document.addEventListener('keydown', (e) => {
+            const key = e.key.toLowerCase();
+            const validKeys = ['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
+            if (validKeys.includes(key)) {
+                e.preventDefault();
+                let k = key.replace('arrow', '');
+                if (k === 'up') k = 'w';
+                if (k === 'down') k = 's';
+                if (k === 'left') k = 'a';
+                if (k === 'right') k = 'd';
+
+                if (!keys[k]) {
+                    keys[k] = true;
+                    document.getElementById(keyMap[e.key] || keyMap[key]).classList.add('pressed');
+                    calculateDrive();
+                }
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            const key = e.key.toLowerCase();
+            const validKeys = ['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
+            if (validKeys.includes(key)) {
+                e.preventDefault();
+                let k = key.replace('arrow', '');
+                if (k === 'up') k = 'w';
+                if (k === 'down') k = 's';
+                if (k === 'left') k = 'a';
+                if (k === 'right') k = 'd';
+
+                if (keys[k]) {
+                    keys[k] = false;
+                    const el = document.getElementById(keyMap[e.key] || keyMap[key]);
+                    if(el) el.classList.remove('pressed');
+                    calculateDrive();
+                }
+            }
+        });
+
+        // Mouse/Touch logic
+        const dirBtns = {
+            'dpad-up': 'w',
+            'dpad-down': 's',
+            'dpad-left': 'a',
+            'dpad-right': 'd'
+        };
+        
+        for (const [id, k] of Object.entries(dirBtns)) {
+            const el = document.getElementById(id);
+            if (!el) continue;
+            const startHandler = (e) => {
+                e.preventDefault();
+                keys[k] = true;
+                el.classList.add('pressed');
+                calculateDrive();
+            };
+            const endHandler = (e) => {
+                e.preventDefault();
+                keys[k] = false;
+                el.classList.remove('pressed');
+                calculateDrive();
+            };
+            el.addEventListener('mousedown', startHandler);
+            el.addEventListener('mouseup', endHandler);
+            el.addEventListener('mouseleave', endHandler);
+            el.addEventListener('touchstart', startHandler, {passive: false});
+            el.addEventListener('touchend', endHandler, {passive: false});
+            el.addEventListener('touchcancel', endHandler, {passive: false});
         }
 
         async function pollTelemetry() {

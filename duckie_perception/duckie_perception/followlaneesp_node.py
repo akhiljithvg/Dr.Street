@@ -8,8 +8,9 @@ import serial
 
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Bool
+from std_msgs.msg import Bool, String
 from sensor_msgs.msg import Image
+from geometry_msgs.msg import Twist
 
 
 class FollowLaneESPNode(Node):
@@ -27,11 +28,11 @@ class FollowLaneESPNode(Node):
         self.FRAME_WIDTH = self.get_parameter('frame_width').value
         self.FRAME_HEIGHT = self.get_parameter('frame_height').value
         self.BASE_SPEED = 45
-        self.MIN_SPEED = 15
+        self.MIN_SPEED = 30
         self.STEER_GAIN = 0.50
         self.STEER_D = 0.60
-        self.APPROACH_SPEED = 15
-        self.ARUCO_TRIGGER_AREA = 1500
+        self.APPROACH_SPEED = 30
+        self.ARUCO_TRIGGER_AREA = 2000
 
         self.lower_red1 = np.array([0, 110, 70])
         self.upper_red1 = np.array([8, 255, 255])
@@ -66,9 +67,12 @@ class FollowLaneESPNode(Node):
         # --- Motor enable gate (controlled via web UI) ---
         # Starts as False — motors will not move until /robot_enabled publishes True.
         self.robot_enabled = False
+        self.control_mode = 'auto'
 
         # Subscribe to the enable/disable topic published by video_stream_node
         self.create_subscription(Bool, '/robot_enabled', self._robot_enabled_cb, 10)
+        self.create_subscription(String, '/control_mode', self._control_mode_cb, 10)
+        self.create_subscription(Twist, '/cmd_manual', self._manual_cmd_cb, 10)
 
         # Publisher for raw camera frames to avoid device contention
         self.image_pub = self.create_publisher(Image, '/camera/image_raw', 10)
@@ -97,14 +101,31 @@ class FollowLaneESPNode(Node):
         if self.robot_enabled and not prev:
             self.get_logger().info('🟢 Robot ENABLED — starting lane following')
         elif not self.robot_enabled and prev:
-            self.stop_motor()
+            self.stop_motor(auto_cmd=False)
             self.get_logger().info('🔴 Robot DISABLED — motors stopped')
+
+    def _control_mode_cb(self, msg: String):
+        prev = getattr(self, 'control_mode', 'auto')
+        self.control_mode = msg.data
+        if self.control_mode != prev:
+            self.stop_motor(auto_cmd=False)
+            self.get_logger().info(f'Control mode switched to {self.control_mode.upper()}')
+
+    def _manual_cmd_cb(self, msg: Twist):
+        if getattr(self, 'control_mode', 'auto') == 'manual' and self.robot_enabled:
+            speed = msg.linear.x
+            turn = msg.angular.z
+            left = speed - turn
+            right = speed + turn
+            self.set_motor(right, left, auto_cmd=False)
 
     # ------------------------------------------------
     def clamp(self, x, lo=0, hi=100):
         return max(lo, min(hi, int(x)))
 
-    def set_motor(self, right, left):
+    def set_motor(self, right, left, auto_cmd=True):
+        if auto_cmd and getattr(self, 'control_mode', 'auto') == 'manual':
+            return
         # Convert requested motion values into the ESP32 PWM protocol.
         # The node uses a symmetric command format: left and right values are sent as integers.
         actual_left = right
@@ -127,8 +148,8 @@ class FollowLaneESPNode(Node):
         except Exception as exc:
             self.get_logger().warning(f'Failed to write to serial: {exc}')
 
-    def stop_motor(self):
-        self.set_motor(0, 0)
+    def stop_motor(self, auto_cmd=True):
+        self.set_motor(0, 0, auto_cmd=auto_cmd)
 
     def has_red_lane(self, frame):
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
@@ -207,7 +228,11 @@ class FollowLaneESPNode(Node):
 
         # Gate: do not move motors until the web UI sends the START command.
         if not self.robot_enabled:
-            self.stop_motor()
+            self.stop_motor(auto_cmd=True)
+            return
+
+        # If manual mode, skip all autonomous logic (ArUco, PID, Junctions)
+        if getattr(self, 'control_mode', 'auto') == 'manual':
             return
 
         action_to_execute = None
@@ -258,9 +283,42 @@ class FollowLaneESPNode(Node):
 
         clean_mask = cv2.morphologyEx(raw_mask, cv2.MORPH_CLOSE, self.vertical_kernel)
         steer_slice = clean_mask[80 : self.FRAME_HEIGHT, :]
+        
+        # --- Gap Detection for Junctions (Distance between consecutive dashes) ---
+        def get_centroid(c):
+            M_c = cv2.moments(c)
+            if M_c['m00'] > 0:
+                return np.array([M_c['m10']/M_c['m00'], M_c['m01']/M_c['m00']])
+            x, y, w, h = cv2.boundingRect(c)
+            return np.array([x + w/2.0, y + h/2.0])
+
+        full_contours, _ = cv2.findContours(clean_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        valid_contours = [c for c in full_contours if cv2.contourArea(c) > 50]
+        
+        is_junction_by_gap = False
+        if len(valid_contours) > 1:
+            contours_sorted = sorted(valid_contours, key=lambda c: get_centroid(c)[1])
+            max_dist = 0
+            for i in range(len(contours_sorted) - 1):
+                c1 = get_centroid(contours_sorted[i])
+                c2 = get_centroid(contours_sorted[i+1])
+                dist = np.linalg.norm(c1 - c2)
+                if dist > max_dist:
+                    max_dist = dist
+            
+            # If the distance between any two consecutive dashes is larger than 40% of the frame height
+            if max_dist > self.FRAME_HEIGHT * 0.40:
+                is_junction_by_gap = True
+
         M = cv2.moments(steer_slice)
 
-        if M['m00'] > 100:
+        if is_junction_by_gap:
+            self.get_logger().info('Junction gap detected! Moving slow, straight to check ArUco.')
+            self.set_motor(self.MIN_SPEED, self.MIN_SPEED)
+            self.ema_error = 0.0
+            self.last_error = 0.0
+            self.last_steer_value = 0.0
+        elif M['m00'] > 100:
             cX = int(M['m10'] / M['m00'])
             raw_error = cX - (self.FRAME_WIDTH // 2)
             self.ema_error = (self.error_alpha * raw_error) + ((1.0 - self.error_alpha) * self.ema_error)
@@ -278,7 +336,9 @@ class FollowLaneESPNode(Node):
             self.set_motor(max(0, self.ema_speed + steer), max(0, self.ema_speed - steer))
         else:
             self.get_logger().info('Line lost, maintaining trajectory...')
-            self.set_motor(self.BASE_SPEED + self.last_steer_value, self.BASE_SPEED - self.last_steer_value)
+            if self.control_mode == 'auto':
+                reduced_speed = 25
+                self.set_motor(reduced_speed + self.last_steer_value, reduced_speed - self.last_steer_value)
 
     def destroy_node(self):
         self.stop_motor()
